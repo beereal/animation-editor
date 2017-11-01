@@ -383,16 +383,9 @@ iframe {
     opacity: .7;
 }
 
-.smart-editor li.collapsable > a:after {
-    content: "+";
-    width: 1rem;
-    height: 1rem;
+.smart-editor li.collapsable > a > .expand {
     position: absolute;
-    right: .5rem;
-}
-
-.smart-editor li.collapsable.collapsed > a:after {
-    content: "-";
+    right: 1rem;
 }
 
 .smart-editor li > ul {

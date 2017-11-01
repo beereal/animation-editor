@@ -3,7 +3,6 @@ class Editor {
     // Constructor
     constructor() {
         // Initialize Properties
-        this.dom = [];
         this.canvas = document.querySelector('.canvas');
 
         // Initialize editors and render.
@@ -44,26 +43,32 @@ class Editor {
         this.iFrame.frameBorder = '0';
         this.iFrame.scrolling = 'no';
         this.canvas.appendChild(this.iFrame);
+        this.iFrameDoc = this.iFrame.contentWindow.document;
         let content = `<!DOCTYPE html><html><head><title>Rendered Results</title></head><body></body></html>`;
-        this.iFrame.contentWindow.document.open('text/html', 'replace');
-        this.iFrame.contentWindow.document.write(content);
-        this.iFrame.contentWindow.document.close();
+        this.iFrameDoc.open('text/html', 'replace');
+        this.iFrameDoc.write(content);
+        this.iFrameDoc.close();
     }
 
     // Set Listeners for editors
     setListeners() {
+
+        // Every change render the results.
         this.cssEditor.on("change", (i, e) => {
             this.render(this.htmlEditor.getValue(), i.getValue());
         });
 
+        // On blur beautify code
         this.cssEditor.on("blur", (i, e) => {
             this.cssEditor.setValue(css_beautify(this.cssEditor.getValue()));
         });
 
+        // Every change render the results.
         this.htmlEditor.on("change", (i, e) => {
             this.render(i.getValue(), this.cssEditor.getValue());
         });
 
+        // On blur beautify code
         this.htmlEditor.on("blur", (i, e) => {
             this.htmlEditor.setValue(html_beautify(this.htmlEditor.getValue()));
         });
@@ -90,52 +95,72 @@ class Editor {
 
     // Render results on iFrame
     render(html, css) {
-        this.iFrame.contentWindow.document.open('text/html', 'replace');
-        this.iFrame.contentWindow.document.write(html + `<style>${css}</style>`);
-        if (this.iFrame.contentWindow.document.body)
-            this.iFrame.contentWindow.document.body.style.margin = 0;
-        this.iFrame.contentWindow.document.close();
+
+        // Add unique ID to each element
+        html = html.replace(/<(\w+)(.*?)>/g, (match) => {
+            return match.replace('>', ` id="${parseInt(Math.random() * Date.now())}">`);
+        });
+
+        // Render code on iFrame
+        this.iFrameDoc.open('text/html', 'replace');
+        this.iFrameDoc.write(html + `<style>${css}</style>`);
+        if (this.iFrameDoc.body) {
+
+            this.iFrameDoc.body.style.margin = 0;
+
+            // Add script to iframe for DOM manipulation
+            if (this.iFrameDoc.querySelector('script') === null) {
+                let script = this.iFrameDoc.createElement('script');
+                script.src = 'dom.js';
+                this.iFrameDoc.body.appendChild(script);
+            }
+        }
+        this.iFrameDoc.close();
+
+        // Scan HTML & Render DOM Editor
         this.dom = [];
-        this.dom = this.scanElements(html);
-        console.log(this.dom);
+        this.dom = this.scanElements(this.getHtmlRendered(html));
         this.renderSmart();
     }
 
     // Scan HTML Elements from Editor
-    scanElements(html) {
-        let regex = /<(\w+|(input|br|hr|img)).*?>(.|[\n\r\t\0])*?(<\/\1>|(?!\2))/g;
-        let elements = html.match(regex);
+    scanElements(nodes) {
         let result = [];
-        if (Array.isArray(elements)) {
-            elements.map(res => {
-                let div = document.createElement('div');
-                res = res.replace(/(\t+\n+)/g, '')
-                div.innerHTML = res;
-                let childNodes = Array.from(div.childNodes[0].childNodes);
-                div.childNodes[0].innerHTML = '';
-                let test = div.childNodes[0];
-                let object = {
-                    tagName: test.nodeName,
-                    children: [],
-                    classes: test.className.split(' ').filter(i => i !== '')
-                };
-                if (Array.isArray(childNodes) && childNodes.length) {
-                    let children = childNodes.filter(e => e.nodeType === 1);
-                    if (Array.isArray(children) && children.length) {
-                        children.forEach(el => {
-                            object.children.push(this.scanElements(el.outerHTML).shift());
-                        });
+        if (nodes.length) {
+            nodes.forEach(node => {
+                console.log(node);
+                if (node.nodeType !== undefined && node.nodeType === 1) {
+                    let object = {
+                        id: node.id,
+                        tagName: node.nodeName,
+                        children: [],
+                        classes: node.className.split(' ').filter(i => i !== '')
+                    };
+    
+                    if (node.hasChildNodes()) {
+                        object.children = this.scanElements(node.childNodes);
                     }
+    
+                    result.push(object);
                 }
-                result.push(object);
             });
         }
 
         return result;
     }
 
+    // Convert HTML text to DOM
+    getHtmlRendered(html) {
+        let div = document.createElement('div');
+        html = html.replace(/(\t+\n+)/g, '');
+        div.innerHTML = html;
+
+        return div.childNodes;
+    }
+
     // Render DOM Editor from HTML
     renderSmart() {
+        console.log(this.dom);
         let smart = document.querySelector('.smart-editor');
         smart.innerHTML = '';
         let ul = document.createElement('ul');
@@ -155,17 +180,15 @@ class Editor {
         a.innerHTML = el.tagName;
         a.appendChild(classesSpan);
         a.appendChild(this.renderElView(el));
-        // DOM Item OnClick
+
+        // DOM Item OnClick (Selection)
         a.addEventListener('click', e => {
-
-            if (li.classList.contains('collapsable'))
-                li.classList.toggle('collapsed');
-
             if (!a.classList.contains('selected')) {
                 let selected = document.querySelector('.smart-editor .selected');
                 if (selected !== null)
                     selected.classList.remove('selected');
                 a.classList.add('selected');
+                this.iFrame.contentWindow.selectEl(el.id);
             }
 
             e.stopPropagation();
@@ -180,6 +203,7 @@ class Editor {
                 ul.appendChild(this.renderSmartEl(el));
             });
             li.appendChild(ul);
+            a.appendChild(this.renderElExpand(el, li));
         }
 
         return li;
@@ -197,9 +221,35 @@ class Editor {
             if (icon.classList.contains('fa-eye')) {
                 icon.classList.remove('fa-eye');
                 icon.classList.add('fa-eye-slash');
+                this.iFrameDoc.getElementById(el.id).style.opacity = '0';
             } else {
                 icon.classList.remove('fa-eye-slash');
                 icon.classList.add('fa-eye');
+                this.iFrameDoc.getElementById(el.id).style.opacity = '';
+            }
+            e.stopPropagation();
+        });
+
+        return a;
+    }
+
+    // Render accordion toggle by element
+    renderElExpand(el, li) {
+        let a = document.createElement('a');
+        let icon = document.createElement('i');
+        a.className = 'expand';
+        icon.className = 'fa fa-plus';
+        a.appendChild(icon);
+
+        a.addEventListener('click', e => {
+
+            li.classList.toggle('collapsed');
+            if (icon.classList.contains('fa-plus')) {
+                icon.classList.remove('fa-plus');
+                icon.classList.add('fa-minus');
+            } else {
+                icon.classList.remove('fa-minus');
+                icon.classList.add('fa-plus');
             }
             e.stopPropagation();
         });
