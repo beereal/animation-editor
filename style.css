@@ -370,22 +370,12 @@ iframe {
     position: relative;
 }
 
-.smart-editor li > a .view {
-    position: absolute;
-    right: 2.5rem;
-}
-
 .smart-editor li > a.selected {
     background-color: #4285f4;
 }
 
 .smart-editor li > a:hover {
     opacity: .7;
-}
-
-.smart-editor li.collapsable > a > .expand {
-    position: absolute;
-    right: 1rem;
 }
 
 .smart-editor li > ul {
@@ -398,4 +388,13 @@ iframe {
 .smart-editor li.collapsed > ul {
     height: auto;
     opacity: 1;
+}
+
+.smart-editor li > a > .actions {
+    position: absolute;
+    right: 1rem;
+}
+
+.smart-editor li > a > .actions > a {
+    margin-left: 1rem;
 }

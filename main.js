@@ -175,11 +175,17 @@ class Editor {
         let li = document.createElement('li');
         let a = document.createElement('a');
         let classesSpan = document.createElement('span');
+        let actions = document.createElement('span');
+
         if (el.classes.length)
             classesSpan.innerHTML = `.${el.classes.join('.')}`;
+        
         a.innerHTML = el.tagName;
         a.appendChild(classesSpan);
-        a.appendChild(this.renderElView(el));
+        actions.className = 'actions'
+        actions.appendChild(this.renderElConfig(el));
+        actions.appendChild(this.renderElView(el));
+        a.appendChild(actions);
 
         // DOM Item OnClick (Selection)
         a.addEventListener('click', e => {
@@ -203,7 +209,7 @@ class Editor {
                 ul.appendChild(this.renderSmartEl(el));
             });
             li.appendChild(ul);
-            a.appendChild(this.renderElExpand(el, li));
+            actions.appendChild(this.renderElExpand(el, li));
         }
 
         return li;
@@ -227,6 +233,21 @@ class Editor {
                 icon.classList.add('fa-eye');
                 this.iFrameDoc.getElementById(el.id).style.opacity = '';
             }
+            e.stopPropagation();
+        });
+
+        return a;
+    }
+
+    // Render config toggle by element
+    renderElConfig(el) {
+        let a = document.createElement('a');
+        let icon = document.createElement('i');
+        a.className = 'config';
+        icon.className = 'fa fa-cog';
+        a.appendChild(icon);
+
+        a.addEventListener('click', e => {
             e.stopPropagation();
         });
 
